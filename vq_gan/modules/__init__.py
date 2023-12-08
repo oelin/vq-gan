@@ -6,13 +6,50 @@ import torch.nn.functional as F
 
 from einops import rearrange
 
-from vq_gan.macros import (
+from . macros import (
     Convolution1x1, 
     Convolution3x3, 
     Convolution4x4,
     Normalization,
     Repeat,
 )
+
+
+class ResidualBlock(nn.Module):
+
+    def __init__(self, channels: int) -> None:
+        super().__init__()
+
+        self.normalization = Normalization(channels=channels)
+
+        self.convolution = Convolution3x3(
+            input_channels=channels,
+            output_channels=channels,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+
+        z = self.normalization(x)
+        z = F.leaky_relu(z)
+        z = self.convolution(z)
+
+        return x + z
+
+
+class ResNetBlock(nn.Module):
+
+    def __init__(self, channels: int) -> None:
+        super().__init__()
+
+        self.residual_block_1 = ResidualBlock(channels=channels)
+        self.residual_block_2 = ResidualBlock(channels=channels)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+
+        x = self.residual_block_1(x)
+        x = self.residual_block_2(x)
+
+        return x
 
 
 class UpsampleBlock(nn.Module):
@@ -58,43 +95,6 @@ class DownsampleBlock(nn.Module):
 
         return x
 
-
-class ResidualBlock(nn.Module):
-
-    def __init__(self, channels: int) -> None:
-        super().__init__()
-
-        self.normalization = Normalization(channels=channels)
-
-        self.convolution = Convolution3x3(
-            input_channels=channels,
-            output_channels=channels,
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-
-        z = self.normalization(x)
-        z = F.leaky_relu(z)
-        z = self.convolution(z)
-
-        return x + z
-
-
-class ResNetBlock(nn.Module):
-
-    def __init__(self, channels: int) -> None:
-        super().__init__()
-
-        self.residual_block_1 = ResidualBlock(channels=channels)
-        self.residual_block_2 = ResidualBlock(channels=channels)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-
-        x = self.residual_block_1(x)
-        x = self.residual_block_2(x)
-
-        return x
-  
 
 class AttentionBlock(nn.Module):
 
@@ -143,26 +143,6 @@ class AttentionBlock(nn.Module):
         return x + z
 
 
-class DownBlock(nn.Module):
-
-    def __init__(self, input_channels: int, output_channels: int) ->  None:
-        super().__init__()
-
-        self.resnet_block = ResNetBlock(channels=input_channels)
-        
-        self.downsample_block = DownsampleBlock(
-            input_channels=input_channels,
-            output_channels=output_channels,
-        )
-    
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-
-        x = self.resnet_block(x)
-        x = self.downsample_block(x)
-
-        return x
-
-
 class UpBlock(nn.Module):
 
     def __init__(self, input_channels: int, output_channels: int) -> None:
@@ -179,6 +159,26 @@ class UpBlock(nn.Module):
 
         x = self.resnet_block(x)
         x = self.upsample_block(x)
+
+        return x
+        
+
+class DownBlock(nn.Module):
+
+    def __init__(self, input_channels: int, output_channels: int) ->  None:
+        super().__init__()
+
+        self.resnet_block = ResNetBlock(channels=input_channels)
+        
+        self.downsample_block = DownsampleBlock(
+            input_channels=input_channels,
+            output_channels=output_channels,
+        )
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+
+        x = self.resnet_block(x)
+        x = self.downsample_block(x)
 
         return x
 
