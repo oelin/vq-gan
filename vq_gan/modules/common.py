@@ -4,6 +4,14 @@ import torch.nn.functional as F
 
 from einops import rearrange
 
+from vq_gan.macros import (
+    Convolution1x1, 
+    Convolution3x3, 
+    Convolution4x4,
+    Normalization,
+    Repeat,
+)
+
 
 class UpsampleBlock(nn.Module):
 
